@@ -308,6 +308,10 @@ table.t th{background:var(--surface-2);color:var(--muted);font-weight:700;font-s
 .stepchip .k{font-family:var(--mono);font-size:.66em;color:var(--muted)}
 .stepchip .t{font-size:.78em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:12em}
 .stepchip .segbar{margin-top:.3em}
+.stepcol{flex:0 0 auto;display:flex;flex-direction:column;gap:.25em}
+.sreset{align-self:stretch;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:.12em .5em;font-size:.68em;color:var(--muted);cursor:pointer;white-space:nowrap}
+.sreset:hover:not(:disabled){border-color:var(--fail);color:var(--fail);background:var(--fail-soft)}
+.sreset:disabled{opacity:.35;cursor:default}
 .stepchip[aria-current="true"]{background:var(--ink-2);border-color:var(--ink-2);color:var(--surface)}
 .stepchip[aria-current="true"] .k{color:var(--surface)}
 .pres-grid{display:grid;grid-template-columns:1.85fr .8fr;gap:1.2em;margin-top:.4em}
@@ -960,7 +964,7 @@ function presRender(){
   $('#pres').innerHTML = `<div class="pres-in">
     <div class="pres-top"><span class="sid mono" style="color:var(--accent);font-weight:700">${esc(s.id)}</span><b>${esc(u.title)}</b>
       <span class="keys"><span class="kbd">←</span><span class="kbd">→</span> 이동 <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> Pass·Fail·해당없음 <button class="btn" id="pClose">닫기 (Esc)</button></span></div>
-    <div class="stepchips" role="tablist">${s.sections.map((x,xi)=>{ const xs=stats(x.acts); return x.acts.length? `<button class="stepchip" data-pu="${xi}" aria-current="${xi===a._u}"><div class="k">STEP ${String(xi+1).padStart(2,'0')} · ${xs.done}/${xs.t}</div><div class="t">${esc(x.title.replace(/^\d+\.\s*/,''))}</div>${segbar(xs,'xs')}</button>`:''; }).join('')}</div>
+    <div class="stepchips" role="tablist">${s.sections.map((x,xi)=>{ const xs=stats(x.acts); return x.acts.length? `<div class="stepcol"><button class="sreset" data-preset="${xi}" ${RO||!xs.done?'disabled':''} title="이 STEP의 Pass·Fail·해당없음 판정을 모두 지웁니다">↺ 초기화${xs.done?' ('+xs.done+')':''}</button><button class="stepchip" data-pu="${xi}" aria-current="${xi===a._u}"><div class="k">STEP ${String(xi+1).padStart(2,'0')} · ${xs.done}/${xs.t}</div><div class="t">${esc(x.title.replace(/^\d+\.\s*/,''))}</div>${segbar(xs,'xs')}</button></div>`:''; }).join('')}</div>
     <div class="pres-grid">
       <div class="pcard ${v?'v-'+v:''}"><div class="u">${esc(u.title)}</div><h2>${esc(a.seq)}. ${esc(a.name)}</h2>
         <div class="tags"><span class="mbadge ${modCls(a.module)}">${esc(modName(a.module))}</span><span class="tag">${esc(a.system||'-')}</span>${a.tcode?String(a.tcode).split(/\s*\/\s*|\n/).filter(Boolean).map(t=>`<span class="tag tc">${esc(t)}</span>`).join(''):''}<span class="tag mono">${esc(a.aid)}</span></div>
@@ -975,8 +979,19 @@ function presRender(){
   $('#pClose').onclick=presClose; $('#pPrev').onclick=()=>presMove(-1); $('#pNx').onclick=()=>presMove(1); const pn=$('#pNext'); if(pn) pn.onclick=()=>presMove(1);
   $$('[data-pu]').forEach(b=>b.onclick=()=>{ P.i=s.acts.indexOf(s.sections[+b.dataset.pu].acts[0]); presRender(); });
   $$('[data-pi]').forEach(b=>b.onclick=()=>{ P.i=+b.dataset.pi; presRender(); });
+  $$('[data-preset]').forEach(b=>b.onclick=()=>presResetUnit(+b.dataset.preset));
   $$('[data-pv]').forEach(b=>b.onclick=()=>presVerdict(b.dataset.pv));
   const cur=$('.stepchip[aria-current="true"]'); if(cur) cur.scrollIntoView({block:'nearest',inline:'center'});
+}
+/* STEP(단위업무) 판정 초기화 — 직전 상태는 이 PC 스냅샷으로 자동 보관 */
+function presResetUnit(ui){
+  if(RO){ toast('보기 전용입니다'); return; }
+  const s=P.s, u=s.sections[ui], done=u.acts.filter(a=>verdict(a));
+  if(!done.length) return;
+  if(!confirm(`STEP ${String(ui+1).padStart(2,'0')} ${u.title}\n\n판정 ${done.length}건(Pass·Fail·해당없음)과 수행일·수행자를 지울까요?\nInput·Output·보완사항·메모는 그대로 둡니다. 지우기 전 상태는 자동 백업됩니다.`)) return;
+  localSnap('prerestore', `STEP 초기화 직전 · ${s.id} ${u.title}`);
+  done.forEach(a=>{ put('res:'+a._k, '', `${s.id} › ${a.aid} 판정 초기화`); put('run:'+a._k, '', `${s.id} › ${a.aid} 수행일·수행자 초기화`); paintStep(a._k); });
+  refreshCounts(s); presRender(); toast(`STEP ${String(ui+1).padStart(2,'0')} 판정 ${done.length}건 초기화`);
 }
 function presPaint(){ if(P.s) presRender(); }
 function presMove(d){ P.i=Math.max(0,Math.min(P.s.acts.length-1,P.i+d)); presRender(); }
