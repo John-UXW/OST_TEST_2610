@@ -470,7 +470,7 @@ table.t th{background:var(--surface-2);color:var(--muted);font-weight:700;font-s
 <body>
 <header class="top" id="top">
   <div class="top-in">
-    <div class="brand" id="goHome" role="link" tabindex="0" aria-label="홈으로"><span class="logo">G-ERP</span><b>통합테스트 4차 (10.12) 진행판</b><span class="chip acc">v15</span></div>
+    <div class="brand" id="goHome" role="link" tabindex="0" aria-label="홈으로"><span class="logo">G-ERP</span><b>통합테스트 4차 (10.12) 진행판</b><span class="chip acc">v16</span></div>
     <span class="sync" id="sync" aria-live="polite"></span>
     <span class="sp"></span>
     <div class="grp">
@@ -598,6 +598,7 @@ function applyItems(items, full){
   Object.entries(items).forEach(([k,it])=>{ if(pending[k]) return; const cur=META[k]; if(!full && cur && cur.at>=it.at) return;
     META[k]={by:it.by, at:it.at}; const v=it.v||''; if(val(k)!==v){ if(v) KV[k]=v; else delete KV[k]; changed.push([k, it.by!==myName()]); } });
   cache(); if(changed.length) onRemote(changed);
+  if(typeof cleanCo001Sec3==='function') cleanCo001Sec3();   // GitHub 내용을 받은 뒤 1회 정리
 }
 const myName = ()=> AUTH.name || ($('#tester').value.trim()) || '(무명)';
 function put(k, v, label){
@@ -1347,11 +1348,31 @@ $('#fileImport').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r
   restoreKv(src, '백업 파일 '+f.name); }; r.readAsText(f); e.target.value=''; };
 window.addEventListener('beforeunload', e=>{ if(GH_OK && Object.keys(pending).length){ flush(); e.preventDefault(); e.returnValue=''; } });
 
+/* ================= 1회 정리 (V16) =================
+   10/19에는 CO-001-1(서브)만 수행 → CO-001 원판 「3. 비용예산 조정」에 10/19까지 들어간 판정·수행일·Input/Output·보완·메모를 비움
+   (10/20 이후 CO-001 원판에서 새로 기록한 값은 건드리지 않음 · 정리 직전 상태는 이 PC 스냅샷에 보관) */
+function cleanCo001Sec3(){
+  if(RO || ls.get('clean_co001s3')) return 0;
+  const s=scById('CO-001'); if(!s) return 0;
+  const ui=s.sections.findIndex(u=>/^3\.\s*비용예산 조정/.test(u.title)); if(ui<0) return 0;
+  const u=s.sections[ui], mk=(u.mk!=null?u.mk:ui);
+  const keys=[]; u.acts.forEach(a=>['res:','run:','in:','out:','fix:',''].forEach(p=>keys.push(p+a._k)));
+  keys.push(s.id+'::sec'+mk, s.id+'::run'+mk);
+  const del=keys.filter(k=>KV[k] && (!META[k] || !META[k].at || META[k].at < '2026-10-19T15:00:00.000Z' /* 10/20 00:00 KST */));
+  ls.set('clean_co001s3','1');   // 이 PC에서 1회만 (정리 후 새로 기록한 값은 유지)
+  if(!del.length) return 0;
+  localSnap('prerestore','정리 전 · CO-001 3. 비용예산 조정 (10/19 CO-001-1과 중복 기록) '+del.length+'건');
+  del.forEach(k=>put(k,'', 'CO-001 › 3. 비용예산 조정 정리 (CO-001-1 중복)'));
+  if(VIEW.page==='home' || VIEW.scn==='CO-001') render();
+  toast(`CO-001 「3. 비용예산 조정」의 10/19 기록 ${del.length}건을 비웠습니다 (CO-001-1에만 유지 · 정리 전 상태는 백업 › 이 PC 스냅샷)`);
+  return del.length;
+}
+
 /* ================= 시작 ================= */
 const last = ls.get('last'); if(last && scById(last)){ VIEW.page='scn'; VIEW.scn=last; }
 localSnapDaily(); render(); setTopH(); bkWarn();
 if(Object.keys(pending).length) flushSoon(300);
-pull(true).then(()=>{ render(); if(GH_OK){ setInterval(()=>{ if(!document.hidden){ flush(); pull(false); } }, RO?60000:30000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pull(false); }); if(AUTH.token) ensureBranch().catch(e=>setSync('err',errText(e))); } });
+pull(true).then(()=>{ if(!GH_OK) cleanCo001Sec3(); render(); if(GH_OK){ setInterval(()=>{ if(!document.hidden){ flush(); pull(false); } }, RO?60000:30000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pull(false); }); if(AUTH.token) ensureBranch().catch(e=>setSync('err',errText(e))); } });
 };
 </script>
 <script>
