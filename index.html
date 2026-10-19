@@ -200,6 +200,11 @@ table.t th{background:var(--surface-2);color:var(--muted);font-weight:700;font-s
 /* 단위업무 묶음 */
 .unit{scroll-margin-top:var(--jump,168px);margin-bottom:1.4em}
 .unit-h{display:flex;align-items:center;gap:.7em;flex-wrap:wrap;padding:.5em .2em;border-bottom:2px solid var(--ink-2);margin-bottom:.6em}
+.urun{display:inline-flex;align-items:center;gap:.4em;flex-wrap:wrap;margin-left:.6em}
+.urun .date{width:auto}
+.urun .utester{width:10cm;max-width:60vw}
+.urun .btn.sm{padding:.3em .9em;font-size:.82em}
+.urun .umt{font-size:.72em;color:var(--muted);font-family:var(--mono)}
 .unit-h h3{margin:0;font-size:1em;letter-spacing:-.015em}
 .unit-h .c{font-family:var(--mono);font-size:.78em;color:var(--muted)}
 .unit-h .segbar{width:140px;margin-left:auto}
@@ -465,12 +470,11 @@ table.t th{background:var(--surface-2);color:var(--muted);font-weight:700;font-s
 <body>
 <header class="top" id="top">
   <div class="top-in">
-    <div class="brand" id="goHome" role="link" tabindex="0" aria-label="홈으로"><span class="logo">G-ERP</span><b>통합테스트 4차 (10.12) 진행판</b><span class="chip acc">v14</span></div>
+    <div class="brand" id="goHome" role="link" tabindex="0" aria-label="홈으로"><span class="logo">G-ERP</span><b>통합테스트 4차 (10.12) 진행판</b><span class="chip acc">v15</span></div>
     <span class="sync" id="sync" aria-live="polite"></span>
     <span class="sp"></span>
     <div class="grp">
-      <input type="date" class="fld date mono" id="runDate" aria-label="TEST 수행일">
-      <input type="text" class="fld tester" id="tester" placeholder="수행자 (예: 정재우)" aria-label="TEST 수행자" maxlength="20">
+      <input type="hidden" id="runDate"><input type="hidden" id="tester">
       <button class="btn" id="fsDn" aria-label="글자 작게">A−</button><button class="btn" id="fsUp" aria-label="글자 크게">A＋</button>
       <button class="btn" id="btnRec" hidden title="기록자 전용 — 4자리 비밀번호로 결과·메모 입력">✎ 기록 모드</button>
       <button class="btn" id="btnPres">발표 모드</button>
@@ -685,7 +689,7 @@ function renderHome(){
     ${schedTable()}
     <div class="grid">${list.map(cardHtml).join('')}</div>
     <div class="hint2"><b>사용 흐름</b><ol>
-      <li>상단에 <b>TEST 수행일</b>과 <b>수행자</b>를 지정합니다 (결과 입력 시 함께 기록).</li>
+      <li>스크립트의 단위업무 제목 옆에 <b>수행날짜</b>와 <b>수행인원</b>을 입력하고 <b>저장</b>합니다 (판정 시 Activity 수행일·수행자로 함께 기록).</li>
       <li>시나리오 카드 → <b>스크립트</b>에서 Activity마다 Pass / Fail / 해당없음, Input·Output을 입력합니다. Fail이면 보완사항 칸이 열립니다.</li>
       <li><b>프로세스 맵</b>으로 시스템 간 흐름을 확인하고(화면 폭에 맞춰 줄바꿈, <b>흐름 편집</b>으로 병렬 트랙 지정), 회의 때는 <b>발표 모드</b>(← → 이동, 1·2·3 판정)로 진행합니다.</li>
       <li>마감 후 <b>엑셀 내보내기</b>로 원본 양식(J~P열) 그대로 취합합니다.</li></ol></div>
@@ -700,7 +704,7 @@ function renderHome(){
   $$('.card[data-scn]').forEach(c=>{ c.onclick=()=>go('scn', c.dataset.scn); c.onkeydown=e=>{ if(e.key==='Enter') go('scn', c.dataset.scn); }; });
 }
 function cardHtml(s){
-  const st=stats(s.acts); const memoN = Object.keys(KV).filter(k=>k.startsWith(s.id+'::')||k.startsWith(s.id+'#')).length;
+  const st=stats(s.acts); const memoN = Object.keys(KV).filter(k=>(k.startsWith(s.id+'::')&&!/::run\d+$/.test(k))||k.startsWith(s.id+'#')).length;
   const sub = s.kind==='CO' ? esc(s.summary) : `${esc(s.li.group||'')} · ${esc(s.li.target||'')} · ${esc(s.li.domexp||'')} · 연계 ${esc(s.li.sys||'-')}`;
   return `<div class="card ${s.ci} ${cardState(st)}" data-scn="${s.id}" tabindex="0" role="link">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.5em"><span class="id">${esc(s.id)}</span>
@@ -793,10 +797,30 @@ document.addEventListener('click', e=>{ if(e.target.closest && e.target.closest(
 document.addEventListener('toggle', e=>{ const d=e.target; if(d && d.classList && d.classList.contains('foldgrp')) ls.set(d.dataset.fold, d.open? null : '1'); }, true);
 function unitHtml(s,u,ui){
   const st=stats(u.acts);
-  return `<section class="unit" id="u-${ui}" data-u="${ui}"><div class="unit-h"><h3>${esc(u.title)}</h3><span class="c" data-ucnt="${ui}">${st.done} / ${st.t} 완료</span>${u.acts.length? `<span data-ubar="${ui}" style="margin-left:auto;width:140px">${segbar(st)}</span>`:''}</div>
+  return `<section class="unit" id="u-${ui}" data-u="${ui}"><div class="unit-h"><h3>${esc(u.title)}</h3><span class="c" data-ucnt="${ui}">${st.done} / ${st.t} 완료</span>${u.acts.length? urunHtml(s,u,ui) : ''}${u.acts.length? `<span data-ubar="${ui}" style="margin-left:auto;width:140px">${segbar(st)}</span>`:''}</div>
     ${u.acts.length? foldActs(s,u,ui) : `<div class="fwrap"><div class="nonebox">Activity 미작성${u.empty?` · Activity ID 빈 슬롯 ${u.empty}개`:''}</div></div>`}
     ${memoBox(s.id+'::sec'+(u.mk!=null?u.mk:ui), '단락 메모 · '+u.title)}</section>`;
 }
+/* 단위업무별 수행날짜 · 수행인원 (키 <시나리오>::run<mk> = 날짜|인원) — 저장 버튼으로 기록, 판정 시 이 값이 Activity 수행일·수행자로 들어감 */
+const urunKey = (s,u,ui)=> s.id+'::run'+(u.mk!=null?u.mk:ui);
+function urunVal(s,u,ui){ const r=val(urunKey(s,u,ui)).split('|'); return {d:r[0]||'', p:r.slice(1).join('|')||''}; }
+function urunHtml(s,u,ui){ const k=urunKey(s,u,ui), r=urunVal(s,u,ui);
+  return `<span class="urun" data-urk="${esc(k)}" data-ui="${ui}"><input type="date" class="fld date mono" data-ud value="${esc(r.d||today())}" aria-label="수행날짜 · ${esc(u.title)}" ${RO?'disabled':''}>
+    <input type="text" class="fld utester" data-up value="${esc(r.p)}" maxlength="1000" placeholder="수행인원 (예: PU(김미영,김은영)외)" aria-label="수행인원 · ${esc(u.title)}" title="${esc(r.p)}" ${RO?'disabled':''}>
+    <button class="btn primary sm" data-usave ${RO?'disabled':''}>저장</button><span class="umt" data-umt>${val(k)&&metaText(k)? '저장됨 · '+esc(metaText(k)):''}</span></span>`; }
+function urunOf(s,a){ const u=s.sections[a._u]; const box=document.querySelector(`.urun[data-urk="${CSS.escape(urunKey(s,u,a._u))}"]`);
+  const sv=urunVal(s,u,a._u); const d=(box&&$('[data-ud]',box).value)||sv.d||today(); const p=((box&&$('[data-up]',box).value)||sv.p||'').trim()||myName(); return d+'|'+p; }
+function urunSave(s, box){
+  const ui=+box.dataset.ui, u=s.sections[ui], k=box.dataset.urk;
+  const d=$('[data-ud]',box).value||today(), p=$('[data-up]',box).value.trim();
+  if(!put(k, d+'|'+p, `${s.id} › ${u.title} 수행날짜·수행인원`)) return;
+  let n=0; u.acts.forEach(a=>{ if(verdict(a)){ put('run:'+a._k, d+'|'+(p||myName()), `${s.id} › ${a.aid} 수행일·수행자`); paintStep(a._k); n++; } });
+  const m=$('[data-umt]',box); if(m) m.textContent='저장됨 · '+(metaText(k)||'');
+  $('[data-up]',box).title=p;
+  toast(`${u.title} 수행날짜·수행인원 저장${n?` · 판정된 Activity ${n}건 반영`:''}`);
+}
+document.addEventListener('click', e=>{ const b=e.target.closest && e.target.closest('[data-usave]'); if(!b) return; const s=scById(VIEW.scn); if(s) urunSave(s, b.closest('.urun')); });
+document.addEventListener('keydown', e=>{ if(e.key!=='Enter') return; const t=e.target; if(!(t.matches && t.matches('.urun input'))) return; const s=scById(VIEW.scn); if(s){ e.preventDefault(); urunSave(s, t.closest('.urun')); } });
 function fieldHtml(a, kind, label, src){
   const k = kind+':'+a._k; const v = val(k);
   const locked = !v && NONE_RE.test(src||'') && !ls.get('unlock_'+k);
@@ -872,7 +896,7 @@ function setVerdict(s, k, v){
   const a=s.acts.find(x=>x._k===k); if(!a) return;
   const nv = verdict(a)===v ? '' : v;           // 같은 버튼 다시 누르면 해제
   if(!put('res:'+k, nv, `${s.id} › ${a.aid} ${a.name}`)) return;
-  put('run:'+k, nv? ($('#runDate').value||today())+'|'+($('#tester').value.trim()||myName()) : '', `${s.id} › ${a.aid} 수행일·수행자`);
+  put('run:'+k, nv? urunOf(s,a) : '', `${s.id} › ${a.aid} 수행일·수행자`);
   paintStep(k); refreshCounts(s);
   if(nv==='Fail'){ const st=$('#s-'+CSS.escape(k)); if(st){ const fx=$('[data-fix]',st); fx.hidden=false; const ob=$('[data-open="fix"]',st); if(ob) ob.remove(); setTimeout(()=>$('textarea',fx).focus(),30); } }
   toast(nv? `${a.aid} ${VLABEL[nv]}` : `${a.aid} 판정 해제`);
@@ -905,6 +929,7 @@ function onRemote(changed){
   let resChanged=false;
   changed.forEach(([k,remote])=>{
     if(k.startsWith('res:')||k.startsWith('run:')){ resChanged=true; paintStep(k.slice(4)); return; }
+    if(/::run\d+$/.test(k)){ $$(`.urun[data-urk="${CSS.escape(k)}"]`).forEach(box=>{ if(box.contains(document.activeElement)) return; const r=val(k).split('|'); $('[data-ud]',box).value=r[0]||today(); $('[data-up]',box).value=r.slice(1).join('|'); const m=$('[data-umt]',box); if(m) m.textContent= val(k)? '저장됨 · '+(metaText(k)||''):''; }); return; }
     if(k.startsWith('flow:')){ if(VIEW.page==='scn' && VIEW.sub==='map' && 'flow:'+VIEW.scn===k){ const s=scById(VIEW.scn); buildMap(s); drawFlow(s); } return; }
     $$(`[data-kv="${CSS.escape(k)}"]`).forEach(t=>{ if(document.activeElement===t){ $$(`[data-mt="${CSS.escape(k)}"]`).forEach(m=>{ m.textContent='다른 사용자가 수정함'; m.classList.add('remote'); }); return; } t.value=val(k);
       const box=t.closest('[data-fix],[data-memo]'); if(box && val(k)) box.hidden=false; });
@@ -1142,7 +1167,7 @@ function exportXlsx(){
   const scs = VIEW.page==='scn'? [scById(VIEW.scn)].filter(s=>s.acts.length) : SC.filter(s=>s.acts.length);
   const sum = SC.map(s=>{ const st=stats(s.acts); return {'시나리오':s.id,'구분':s.kind,'시나리오명':s.name,'단위업무':s.sections.length,'Activity':st.t,'Pass':st.p,'Fail':st.f,'해당없음':st.n,'미수행':st.todo,'진행률(%)':st.pct}; });
   const sheets=[{name:'요약', rows:sum, widths:[10,6,34,8,8,7,7,8,8,9]}].concat(scs.map(s=>({name:s.id, rows:exportRows(s), widths:[9,22,18,5,12,7,34,12,14,44,20,20,11,9,8,32,32,6]})));
-  const memos = Object.keys(KV).filter(k=>!/^(res|run|in|out|fix|flow):/.test(k) && !/#r\d+$/.test(k)).sort().map(k=>({'위치':k,'메모':KV[k],'최종 수정':metaText(k)}));
+  const memos = Object.keys(KV).filter(k=>!/^(res|run|in|out|fix|flow):/.test(k) && !/#r\d+$/.test(k) && !/::run\d+$/.test(k)).sort().map(k=>({'위치':k,'메모':KV[k],'최종 수정':metaText(k)}));
   if(memos.length) sheets.push({name:'단락 메모', rows:memos, widths:[22,70,24]});
   const d=new Date(), nm=`통테4차_결과_${VIEW.page==='scn'?VIEW.scn+'_':''}${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`;
   const a=document.createElement('a'); a.href=URL.createObjectURL(buildXlsx(sheets)); a.download=nm; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },800);
